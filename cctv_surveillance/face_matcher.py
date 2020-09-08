@@ -56,9 +56,8 @@ class FaceMatcher(KafkaStreamingConsumer):
         return known_faces
 
 
-    def match_faces(self, new_face, known_faces, tol):
+    def match_faces(self, faceencod, known_faces, tol):
         knonwn_encodes = known_faces | select(lambda f: f["encod"]) | tolist
-        faceencod = new_face.encod
         matches = face_recognition.compare_faces(knonwn_encodes, faceencod, tol)
 
         # Select only matched records
@@ -69,16 +68,18 @@ class FaceMatcher(KafkaStreamingConsumer):
 
 
     def handle_msg(self, msg):
-        new_face = msg
-        matches= self.match_faces(new_face, self.known_faces, self.match_tol)
+        matches = []
+        for new_face in msg.faces:
+            matches.extend(self.match_faces(new_face, self.known_faces, self.match_tol))
+
         if matches:
             titles= matches | select(lambda m: m["name"]) | tolist
-            new_face.matches = titles
+            msg.matched_faces = titles
             logger.debug(f"match found: {titles}")
-            yield True, new_face
+            yield True, msg
         else:
             logger.debug("New face found. Updating the database...")
-            save_image_data_to_jpg(new_face.imagedata, outpath= self.face_database)
+            save_image_data_to_jpg(msg.raw_frame, outpath= self.face_database)
             self.known_faces = self.load_known_faces()
 
 

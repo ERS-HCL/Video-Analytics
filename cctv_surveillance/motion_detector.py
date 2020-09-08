@@ -1,3 +1,10 @@
+'''
+CREDITS: This code is copied & then modified from:
+Original Author: Adrian Rosebrock
+Blog: Basic Motion detection and tracking with Python and OpenCV
+URL: https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+'''
+
 import os
 import sys
 import logging
@@ -16,6 +23,7 @@ from kafka_client import KafkaImageCli
 from cctv_surveillance.appcommon import init_logger, save_image_data_to_jpg
 
 from kafka_base_consumer import KafkaStreamingConsumer
+from framedata import FrameData
 
 
 
@@ -100,7 +108,7 @@ class MotionDetector(KafkaStreamingConsumer):
 
 
     def handle_msg(self, msg):   
-        motion_detected = self.detect_motion(msg)
+        motion_detected = self.detect_motion(msg.raw_frame)
         yield (motion_detected, msg)     # forward the same frame for further processing, if the motion is detected
 
 
