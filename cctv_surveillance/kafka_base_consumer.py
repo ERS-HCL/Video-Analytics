@@ -51,6 +51,7 @@ class KafkaStreamingConsumer(KafkaBaseConsumer):
             logger.debug("received message from Kafka") 
             for (status, outmsg) in handler(m.value):
                 if status:
+                    outmsg.update_timestamp()
                     kafkaProducer.send_message(outmsg)     
 
 

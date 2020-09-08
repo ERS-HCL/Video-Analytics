@@ -1,6 +1,6 @@
 version: '3'
 
-# Note: Be sure to setup the env variable "VIDEO_ANALYTICS_DATA" pointing to host file system
+# Note: Be sure to setup the env variable "HOST_FOLDER" pointing to host file system
 
 services:
 
@@ -9,14 +9,14 @@ services:
     container_name: movie-feeder
     environment:
       KAFKA_BROKER_URL: kafka:29092
-      TRANSACTIONS_TOPIC: queueing.raw-frames
+      TRANSACTIONS_TOPIC: cctv.raw-frames
       FRAME_CAPTURE_PERIOD: 1                           # Capture frame at every 'n' seconds
-      MOVIE_FILES_SOURCE: "/usr/app/movies"
+      MOVIE_FILES_SOURCE: $DOCKER_HOME/movies
 
     volumes:
-     - ..:/usr/app/sandbox                              # this is for testing the code before commit
-     - ${VIDEO_ANALYTICS_DATA}/movies:/usr/app/movies
-    working_dir: /usr/app/sandbox/cctv_surveillance
+     - ..:${DOCKER_SANDBOX}                              # this is for testing the code before commit
+     - ${HOST_FOLDER}/movies:$DOCKER_HOME/movies
+    working_dir: ${DOCKER_CODE}/cctv_surveillance
     entrypoint: ["python3", "movie_streamer.py"]
   
 
@@ -25,13 +25,12 @@ services:
     container_name: motion-detector
     environment:
       KAFKA_BROKER_URL: kafka:29092
-      INPUT_TOPIC: queueing.raw-frames
-      OUTPUT_TOPIC: transactions.motion
+      INPUT_TOPIC: cctv.raw-frames
+      OUTPUT_TOPIC: cctv.motion-detected
     volumes:
-      - ..:/usr/app/sandbox  
-      - ${VIDEO_ANALYTICS_DATA}/transient-data:/usr/app/temp
-      - ${VIDEO_ANALYTICS_DATA}/output:/usr/app/out
-    working_dir: /usr/app/sandbox/cctv_surveillance
+      - ../:${DOCKER_SANDBOX}  
+      - ${HOST_FOLDER}/output:$DOCKER_HOME/out
+    working_dir: ${DOCKER_CODE}/cctv_surveillance
     entrypoint: ["python3", "motion_detector.py"]  
 
 
@@ -40,12 +39,11 @@ services:
     container_name: face-detector
     environment:
       KAFKA_BROKER_URL: kafka:29092
-      INPUT_TOPIC: transactions.motion
-      OUTPUT_TOPIC: transactions.faces
+      INPUT_TOPIC: cctv.motion-detected
+      OUTPUT_TOPIC: cctv.faces-detected
     volumes:
-      - ..:/usr/app/sandbox  
-      - ${VIDEO_ANALYTICS_DATA}/transient-data:/tmp  
-    working_dir: /usr/app/sandbox/cctv_surveillance
+      - ../:${DOCKER_SANDBOX}  
+    working_dir: ${DOCKER_CODE}/cctv_surveillance
     entrypoint: ["python3", "face_detector.py"]  
 
 
@@ -54,14 +52,14 @@ services:
     container_name: face-matcher
     environment:
       KAFKA_BROKER_URL: kafka:29092
-      INPUT_TOPIC: transactions.faces
+      INPUT_TOPIC: cctv.faces-detected
       OUTPUT_TOPIC: transactions.matched-faces
-      FACE_DATABASE: /tmp/faces
+      FACE_DATABASE: $DOCKER_HOME/faces
       FACE_MATCH_TOL: 0.6
     volumes:
-      - ..:/usr/app/sandbox  
-      - ${VIDEO_ANALYTICS_DATA}/known-faces:/tmp/faces  
-    working_dir: /usr/app/sandbox/cctv_surveillance
+      - ../:${DOCKER_SANDBOX}  
+      - ${HOST_FOLDER}/known-faces:$DOCKER_HOME/faces  
+    working_dir: ${DOCKER_CODE}/cctv_surveillance
     entrypoint: ["python3", "face_matcher.py"]    
 
 
@@ -73,9 +71,9 @@ services:
       INPUT_TOPIC: transactions.matched-faces
       OUTPUT_FILE_LOCATION: /tmp
     volumes:
-      - ..:/usr/app/sandbox  
-      - ${VIDEO_ANALYTICS_DATA}/output:/tmp  
-    working_dir: /usr/app/sandbox/cctv_surveillance
+      - ../:${DOCKER_SANDBOX}  
+      - ${HOST_FOLDER}/output:/tmp  
+    working_dir: ${DOCKER_CODE}/cctv_surveillance
     entrypoint: ["python3", "filesystem_consumer.py"]  
     
 

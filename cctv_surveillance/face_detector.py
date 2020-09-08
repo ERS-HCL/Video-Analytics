@@ -23,21 +23,18 @@ class FaceDetector(KafkaStreamingConsumer):
         os.remove(tempjpg)
         return face_encodings
 
-
-    def create_out_msg(self, imagedata, encod):
-        return FrameData(
-                        id = encod.data.tobytes(), # hash of the encoding matrix: to serve as primary key
-                        imagedata = imagedata,
-                        encod = encod
-        )
         
+    def update_out_msg(self, msg, face_encodings):
+        msg.faces = face_encodings
+        return msg    
+
 
     def handle_msg(self, msg):
-        face_encodings= self.detect_face(msg)
-        for encod in face_encodings:
+        face_encodings= self.detect_face(msg.raw_frame)
+        if face_encodings:
             logger.debug("detected a face... sending to kafka topic...")
-            outmsg= self.create_out_msg(msg, encod)
-            yield True, outmsg
+            msg = self.update_out_msg(msg, face_encodings)
+            yield True, msg
 
    
 
