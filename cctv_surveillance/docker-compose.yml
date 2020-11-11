@@ -1,81 +1,164 @@
 version: '3'
 
-# Note: Be sure to setup the env variable "HOST_FOLDER" pointing to host file system
+# Note: Be sure to setup the env variable "MOVIE_FILES" pointing to host file system
+
+volumes:
+  results:
+    driver: local
+  known-faces:
+    driver: local  
+
 
 services:
-
   movie-feeder:
-    build: .
-    container_name: movie-feeder
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
     environment:
       KAFKA_BROKER_URL: kafka:29092
       TRANSACTIONS_TOPIC: cctv.raw-frames
       FRAME_CAPTURE_PERIOD: 1                           # Capture frame at every 'n' seconds
-      MOVIE_FILES_SOURCE: $DOCKER_HOME/movies
-
+      MOVIE_FILES: ${DOCKER_HOME}/movies
     volumes:
      - ..:${DOCKER_SANDBOX}                              # this is for testing the code before commit
-     - ${HOST_FOLDER}/movies:$DOCKER_HOME/movies
-    working_dir: ${DOCKER_CODE}/cctv_surveillance
+     - ${MOVIE_FILES}:${DOCKER_HOME}/movies
+     - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+     - /etc/timezone:/etc/timezone:ro
+     - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services
     entrypoint: ["python3", "movie_streamer.py"]
   
 
   motion-detector:
-    build: .  
-    container_name: motion-detector
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
     environment:
       KAFKA_BROKER_URL: kafka:29092
       INPUT_TOPIC: cctv.raw-frames
       OUTPUT_TOPIC: cctv.motion-detected
     volumes:
       - ../:${DOCKER_SANDBOX}  
-      - ${HOST_FOLDER}/output:$DOCKER_HOME/out
-    working_dir: ${DOCKER_CODE}/cctv_surveillance
+      - results:${DOCKER_HOME}/out
+      - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services
     entrypoint: ["python3", "motion_detector.py"]  
 
 
-  face-detector:
-    build: .
-    container_name: face-detector
+  object-detector:
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
     environment:
       KAFKA_BROKER_URL: kafka:29092
       INPUT_TOPIC: cctv.motion-detected
+      OUTPUT_TOPIC: cctv.object-detected
+    volumes:
+      - ../:${DOCKER_SANDBOX}  
+      - results:${DOCKER_HOME}/out
+      - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services/object_detector
+    entrypoint: ["python3", "object_detector.py"]    
+
+
+  face-detector:
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
+    environment:
+      KAFKA_BROKER_URL: kafka:29092
+      INPUT_TOPIC: cctv.object-detected
       OUTPUT_TOPIC: cctv.faces-detected
     volumes:
       - ../:${DOCKER_SANDBOX}  
-    working_dir: ${DOCKER_CODE}/cctv_surveillance
+      - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services
     entrypoint: ["python3", "face_detector.py"]  
 
 
   face-matcher:
-    build: .
-    container_name: face-matcher
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
     environment:
       KAFKA_BROKER_URL: kafka:29092
       INPUT_TOPIC: cctv.faces-detected
-      OUTPUT_TOPIC: transactions.matched-faces
-      FACE_DATABASE: $DOCKER_HOME/faces
+      OUTPUT_TOPIC: cctv.matched-faces
+      FACE_DATABASE: ${DOCKER_HOME}/faces
       FACE_MATCH_TOL: 0.6
     volumes:
       - ../:${DOCKER_SANDBOX}  
-      - ${HOST_FOLDER}/known-faces:$DOCKER_HOME/faces  
-    working_dir: ${DOCKER_CODE}/cctv_surveillance
-    entrypoint: ["python3", "face_matcher.py"]    
+      - known-faces:${DOCKER_HOME}/faces  
+      - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services
+    entrypoint: ["python3", "face_matcher.py"]  
+   
 
-
-  filesystem-consumer:
-    build: .
-    container_name: filesystem-consumer
+  message-aggregator:
+    build:
+      context: ./Dockerfiles
+      dockerfile: ComputerVision.Dockerfile
     environment:
       KAFKA_BROKER_URL: kafka:29092
-      INPUT_TOPIC: transactions.matched-faces
+      INPUT_TOPIC: cctv.matched-faces
       OUTPUT_FILE_LOCATION: /tmp
     volumes:
       - ../:${DOCKER_SANDBOX}  
-      - ${HOST_FOLDER}/output:/tmp  
-    working_dir: ${DOCKER_CODE}/cctv_surveillance
-    entrypoint: ["python3", "filesystem_consumer.py"]  
-    
+      - results:/tmp  
+      - ./protobuf/kafka_message_pb2.py:${DOCKER_CODE}/cctv_surveillance/protobuf/kafka_message_pb2.py:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    working_dir: ${DOCKER_CODE}/cctv_surveillance/services
+    entrypoint: ["python3", "message_aggregator.py"]  
+
+  
+  logstash:
+    build:
+      context: ./Dockerfiles
+      dockerfile: Logstash.Dockerfile
+    volumes:
+      - ./config/logstash.conf:/usr/share/logstash/config/kafka-logstash.conf:ro  
+      - ./protobuf/kafka_message_pb.rb:/usr/share/logstash/config/kafka_message_pb.rb:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx512m -Xms512m"
+    command: logstash -f /usr/share/logstash/config/kafka-logstash.conf
+    depends_on:
+      - elasticsearch    
+      - object-detector
+    links:
+      - elasticsearch    
+      
+  
+  
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+    environment:
+        - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        - "discovery.type=single-node"
+        - "xpack.security.enabled=false"
+    ports:
+      -   "9200:9200"
+      -   "9300:9300"
+    volumes:
+      - ./config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "curl","-s" ,"-f", "http://localhost:9200/_cat/health"]
+   
 
 
 networks:

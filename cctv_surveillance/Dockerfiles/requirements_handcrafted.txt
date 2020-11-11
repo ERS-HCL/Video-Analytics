@@ -1,0 +1,14 @@
+pipe
+PyYAML
+kafka-python
+
+opencv-python
+opencv-contrib-python
+
+dlib
+face-recognition
+face-recognition-models
+imutils
+
+google
+protobuf
