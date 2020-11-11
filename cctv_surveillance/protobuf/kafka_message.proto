@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+// Not necessary for Python but should still be declared to avoid name collisions 
+// in the Protocol Buffers namespace and non-Python languages
+//package cctv;
+
+//Note:
+//1. Make sure to run "compile_protobuf.sh" for any change in this .proto file
+//2. The line "package xxx" above is commented out. This is because for a strange reason as it 
+//   breaks logstash. This is possibly due to the older version of protobuf used by the logstash image
+
+
+message Frame {
+    message RawFrame {
+        string movie_filename = 1;
+        string movie_filepath = 2;
+        bytes image_bytes = 3;
+    }
+
+    RawFrame raw_frame = 1;
+    float t_created = 2;
+    float t_updated = 3;
+
+    repeated string objects = 4;
+    repeated bytes faces = 5;
+    repeated string matched_faces = 6;
+    
+}
+

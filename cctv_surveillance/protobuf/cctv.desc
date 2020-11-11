@@ -1,0 +1,15 @@
+
+ß
+kafka_message.proto"¿
+Frame,
+	raw_frame (2.Frame.RawFrameRrawFrame
+	t_created (RtCreated
+	t_updated (RtUpdated
+objects (	Robjects
+faces (Rfaces#
+matched_faces (	RmatchedFacesy
+RawFrame%
+movie_filename (	RmovieFilename%
+movie_filepath (	RmovieFilepath
+image_bytes (R
+imageBytesbproto3

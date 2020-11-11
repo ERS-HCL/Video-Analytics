@@ -24,7 +24,32 @@ services:
      - /var/run/docker.sock:/var/run/docker.sock
      - ./cctv_surveillance/remove_all_topics.sh:/remove_all_topics.sh
     depends_on:
-     - zookeeper    
+     - zookeeper 
+     
+     
+  kafdrop:
+    image: obsidiandynamics/kafdrop
+    restart: "no"
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./cctv_surveillance/protobuf:/var/protobuf_desc
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:29092"
+      JVM_OPTS: "-Xms512M -Xmx512M -Xss180K -XX:-TieredCompilation -XX:+UseStringDeduplication -noverify"
+      CMD_ARGS: "--message.format=PROTOBUF --protobufdesc.directory=/var/protobuf_desc"
+    depends_on:
+      - "kafka" 
+      
+      
+  portainer:
+    image: portainer/portainer
+    restart: "always"
+    ports:
+      - "9001:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/portainer:/data portainer/portainer
 
     
 networks:
